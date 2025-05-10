@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       redis_version:
-        description: 'Redis version to download'
+        description: 'Redis major version to download'
         type: choice
         options:
           - '5'
@@ -81,17 +81,50 @@ jobs:
       - name: Download and compile Redis
         if: env.platform_enabled == 'true'
         run: |
-          REDIS_VERSION=${{ github.event.inputs.redis_version }}
+          MAJOR_VERSION=${{ github.event.inputs.redis_version }}
           ARCH=${{ matrix.arch }}
+          
+          # Map major version to specific version
+          case "$MAJOR_VERSION" in
+            "5")
+              REDIS_VERSION="5.0.8"
+              ;;
+            "6")
+              REDIS_VERSION="6.2.8"
+              ;;
+            "7")
+              REDIS_VERSION="7.2.8"
+              ;;
+            *)
+              echo "Unsupported major version: $MAJOR_VERSION"
+              exit 1
+              ;;
+          esac
           
           # Create build directory
           mkdir -p redis-build
           cd redis-build
           
-          # Download Redis source
-          wget https://download.redis.io/releases/redis-${REDIS_VERSION}.0.tar.gz
-          tar xzf redis-${REDIS_VERSION}.0.tar.gz
-          cd redis-${REDIS_VERSION}.0
+          # Download Redis source with error handling
+          RETRY=3
+          while [ $RETRY -gt 0 ]; do
+              wget https://download.redis.io/releases/redis-${REDIS_VERSION}.tar.gz
+              if [ $? -eq 0 ]; then
+                  break
+              fi
+              echo "Download failed, retrying in 5 seconds..."
+              RETRY=$((RETRY-1))
+              sleep 5
+          done
+          
+          if [ ! -f "redis-${REDIS_VERSION}.tar.gz" ]; then
+              echo "Failed to download Redis source after retries"
+              exit 1
+          fi
+          
+          # Extract and compile
+          tar xzf redis-${REDIS_VERSION}.tar.gz
+          cd redis-${REDIS_VERSION}
           
           # Compile Redis with appropriate architecture
           if [ "$ARCH" = "arm64" ]; then
@@ -118,12 +151,13 @@ jobs:
           rm -rf redis-build
           
           echo "FILE_NAME=${BIN_DIR}.tar.gz" >> $GITHUB_ENV
+          echo "REDIS_FULL_VERSION=${REDIS_VERSION}" >> $GITHUB_ENV
 
       - name: Upload artifact
         if: env.platform_enabled == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
-          name: redis-${{ github.event.inputs.redis_version }}-${{ matrix.platform }}
+          name: redis-${{ env.REDIS_FULL_VERSION }}-${{ matrix.platform }}
           path: ${{ env.FILE_NAME }}
 
   build-windows:
@@ -143,9 +177,9 @@ jobs:
       - name: Download Windows Redis
         if: env.platform_enabled == 'true'
         run: |
-          $REDIS_VERSION = "${{ github.event.inputs.redis_version }}"
+          $REDIS_VERSION = "5.0.8"  # Windows always uses 5.0.8
           $FILENAME = "redis-$REDIS_VERSION-windows-x64.zip"
-          $URL = "https://github.com/tporadowski/redis/releases/download/v$($REDIS_VERSION).0.0/Redis-x64-$($REDIS_VERSION).0.0.zip"
+          $URL = "https://github.com/tporadowski/redis/releases/download/v$($REDIS_VERSION)/Redis-x64-$($REDIS_VERSION).zip"
           
           Write-Host "Downloading $URL to $FILENAME"
           
@@ -159,12 +193,13 @@ jobs:
           }
           
           echo "FILE_NAME=$FILENAME" >> $env:GITHUB_ENV
+          echo "REDIS_FULL_VERSION=$REDIS_VERSION" >> $env:GITHUB_ENV
 
       - name: Upload artifact
         if: env.platform_enabled == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
-          name: redis-${{ github.event.inputs.redis_version }}-windows-x64
+          name: redis-${{ env.REDIS_FULL_VERSION }}-windows-x64
           path: ${{ env.FILE_NAME }}
 
   release:
