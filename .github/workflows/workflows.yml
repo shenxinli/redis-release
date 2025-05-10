@@ -3,9 +3,18 @@ name: Redis Release
 on:
   workflow_dispatch:
     inputs:
-      redis_versions:
-        description: 'Redis versions to download (comma-separated)'
-        default: '7,6,5'
+      redis_version:
+        description: 'Redis version to download'
+        type: choice
+        options:
+          - '5'
+          - '6'
+          - '7'
+        default: '7'
+        required: true
+      platforms:
+        description: 'Platforms to build (comma-separated)'
+        default: 'linux/amd64,linux/arm64,windows/x64'
         required: true
       release_tag:
         description: 'Release tag'
@@ -16,35 +25,47 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, ubuntu-20.04]
-        redis_version: ${{ github.event.inputs.redis_versions || '7,6,5' }}
         include:
           - os: ubuntu-latest
             arch: amd64
+            platform: linux/amd64
           - os: ubuntu-20.04
             arch: arm64
+            platform: linux/arm64
       fail-fast: false
 
     steps:
+      - name: Check if platform is enabled
+        id: check_platform
+        run: |
+          if [[ ",${{ github.event.inputs.platforms }}," == *",${{ matrix.platform }},"* ]]; then
+            echo "platform_enabled=true" >> $GITHUB_ENV
+          else
+            echo "platform_enabled=false" >> $GITHUB_ENV
+          fi
+
       - name: Set up QEMU (for ARM64)
-        if: matrix.arch == 'arm64'
+        if: env.platform_enabled == 'true' && matrix.arch == 'arm64'
         uses: docker/setup-qemu-action@v2
         with:
           platforms: arm64
 
       - name: Set up Python
+        if: env.platform_enabled == 'true'
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
       - name: Install dependencies
+        if: env.platform_enabled == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y make gcc
 
       - name: Download and compile Redis
+        if: env.platform_enabled == 'true'
         run: |
-          REDIS_VERSION=${{ matrix.redis_version }}
+          REDIS_VERSION=${{ github.event.inputs.redis_version }}
           ARCH=${{ matrix.arch }}
           
           # Create build directory
@@ -83,22 +104,29 @@ jobs:
           echo "FILE_NAME=${BIN_DIR}.tar.gz" >> $GITHUB_ENV
 
       - name: Upload artifact
+        if: env.platform_enabled == 'true'
         uses: actions/upload-artifact@v3
         with:
-          name: redis-${{ matrix.redis_version }}-linux-${{ matrix.arch }}
+          name: redis-${{ github.event.inputs.redis_version }}-${{ matrix.platform }}
           path: ${{ env.FILE_NAME }}
 
   build-windows:
     runs-on: windows-latest
-    strategy:
-      matrix:
-        redis_version: ${{ github.event.inputs.redis_versions || '7,6,5' }}
-      fail-fast: false
-
     steps:
-      - name: Download Windows Redis
+      - name: Check if platform is enabled
+        id: check_platform
         run: |
-          $REDIS_VERSION = "${{ matrix.redis_version }}"
+          $platforms = "${{ github.event.inputs.platforms }}".Split(',')
+          if ($platforms -contains "windows/x64") {
+            echo "platform_enabled=true" >> $env:GITHUB_ENV
+          } else {
+            echo "platform_enabled=false" >> $env:GITHUB_ENV
+          }
+
+      - name: Download Windows Redis
+        if: env.platform_enabled == 'true'
+        run: |
+          $REDIS_VERSION = "${{ github.event.inputs.redis_version }}"
           $FILENAME = "redis-$REDIS_VERSION-windows-x64.zip"
           $URL = "https://github.com/tporadowski/redis/releases/download/v$($REDIS_VERSION).0.0/Redis-x64-$($REDIS_VERSION).0.0.zip"
           
@@ -116,9 +144,10 @@ jobs:
           echo "FILE_NAME=$FILENAME" >> $env:GITHUB_ENV
 
       - name: Upload artifact
+        if: env.platform_enabled == 'true'
         uses: actions/upload-artifact@v3
         with:
-          name: redis-${{ matrix.redis_version }}-windows
+          name: redis-${{ github.event.inputs.redis_version }}-windows-x64
           path: ${{ env.FILE_NAME }}
 
   release:
