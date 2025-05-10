@@ -45,9 +45,11 @@ jobs:
           - os: ubuntu-latest
             arch: amd64
             platform: linux/amd64
+            platform_safe: linux-amd64
           - os: ubuntu-20.04
             arch: arm64
             platform: linux/arm64
+            platform_safe: linux-arm64
       fail-fast: false
 
     steps:
@@ -87,7 +89,7 @@ jobs:
           # Map major version to specific version
           case "$MAJOR_VERSION" in
             "5")
-              REDIS_VERSION="5.0.8"
+              REDIS_VERSION="5.0.14"
               ;;
             "6")
               REDIS_VERSION="6.2.8"
@@ -134,7 +136,7 @@ jobs:
           fi
           
           # Create binary tarball
-          BIN_DIR="redis-${REDIS_VERSION}-linux-${ARCH}"
+          BIN_DIR="redis-${REDIS_VERSION}-${{ matrix.platform_safe }}"
           mkdir -p $BIN_DIR/bin
           
           # Copy binaries
@@ -157,8 +159,9 @@ jobs:
         if: env.platform_enabled == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: redis-${{ env.REDIS_FULL_VERSION }}-${{ matrix.platform }}
+          name: redis-${{ env.REDIS_FULL_VERSION }}-${{ matrix.platform_safe }}
           path: ${{ env.FILE_NAME }}
+          retention-days: 30
 
   build-windows:
     runs-on: windows-latest
@@ -177,7 +180,7 @@ jobs:
       - name: Download Windows Redis
         if: env.platform_enabled == 'true'
         run: |
-          $REDIS_VERSION = "5.0.8"  # Windows always uses 5.0.8
+          $REDIS_VERSION = "5.0.14"  # Windows always uses 5.0.14
           $FILENAME = "redis-$REDIS_VERSION-windows-x64.zip"
           $URL = "https://github.com/tporadowski/redis/releases/download/v$($REDIS_VERSION)/Redis-x64-$($REDIS_VERSION).zip"
           
@@ -201,6 +204,7 @@ jobs:
         with:
           name: redis-${{ env.REDIS_FULL_VERSION }}-windows-x64
           path: ${{ env.FILE_NAME }}
+          retention-days: 30
 
   release:
     runs-on: ubuntu-latest
@@ -218,7 +222,7 @@ jobs:
           prerelease: false
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: artifacts/
 
