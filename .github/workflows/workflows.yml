@@ -155,7 +155,7 @@ jobs:
 
       - name: Upload artifact
         if: env.platform_enabled == 'true'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: redis-${{ env.REDIS_FULL_VERSION }}-${{ matrix.platform }}
           path: ${{ env.FILE_NAME }}
@@ -197,7 +197,7 @@ jobs:
 
       - name: Upload artifact
         if: env.platform_enabled == 'true'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: redis-${{ env.REDIS_FULL_VERSION }}-windows-x64
           path: ${{ env.FILE_NAME }}
