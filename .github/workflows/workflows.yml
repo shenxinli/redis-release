@@ -79,6 +79,19 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y make gcc
+          # 安装ARM64交叉编译工具链
+          if [[ "${{ matrix.arch }}" == "arm64" ]]; then
+            sudo apt-get install -y crossbuild-essential-arm64
+          fi
+          # 验证编译器是否可用
+          if [[ "${{ matrix.arch }}" == "arm64" ]]; then
+            if ! command -v aarch64-linux-gnu-gcc &> /dev/null; then
+              echo "ARM64 编译器未安装"
+              exit 1
+            else
+              echo "ARM64 编译器版本: $(aarch64-linux-gnu-gcc --version)"
+            fi
+          fi
 
       - name: Download and compile Redis
         if: env.platform_enabled == 'true'
@@ -108,19 +121,20 @@ jobs:
           cd redis-build
           
           # Download Redis source with error handling
+          echo "开始下载 Redis $REDIS_VERSION 源码..."
           RETRY=3
           while [ $RETRY -gt 0 ]; do
               wget https://download.redis.io/releases/redis-${REDIS_VERSION}.tar.gz
               if [ $? -eq 0 ]; then
                   break
               fi
-              echo "Download failed, retrying in 5 seconds..."
+              echo "下载失败，$RETRY 秒后重试..."
               RETRY=$((RETRY-1))
               sleep 5
           done
           
           if [ ! -f "redis-${REDIS_VERSION}.tar.gz" ]; then
-              echo "Failed to download Redis source after retries"
+              echo "多次尝试后仍无法下载 Redis 源码"
               exit 1
           fi
           
@@ -128,11 +142,30 @@ jobs:
           tar xzf redis-${REDIS_VERSION}.tar.gz
           cd redis-${REDIS_VERSION}
           
-          # Compile Redis with appropriate architecture
+          # 为ARM64平台设置编译环境
           if [ "$ARCH" = "arm64" ]; then
-            make -j$(nproc) CC=aarch64-linux-gnu-gcc
+            echo "配置ARM64交叉编译环境..."
+            export CC=aarch64-linux-gnu-gcc
+            export CXX=aarch64-linux-gnu-g++
+            export AR=aarch64-linux-gnu-ar
+            export RANLIB=aarch64-linux-gnu-ranlib
+            
+            # 验证环境变量
+            echo "使用编译器: $(which $CC)"
+            $CC --version
+            
+            # 配置并编译
+            make -j$(nproc) CC=$CC CFLAGS="-march=armv8-a -mtune=cortex-a57"
           else
+            # 原生编译AMD64
+            echo "配置AMD64原生编译环境..."
             make -j$(nproc)
+          fi
+          
+          # 验证编译结果
+          if [ ! -f "src/redis-server" ]; then
+            echo "编译失败: redis-server 未生成"
+            exit 1
           fi
           
           # Create binary tarball
