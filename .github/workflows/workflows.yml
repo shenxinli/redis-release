@@ -154,8 +154,9 @@ jobs:
             echo "使用编译器: $(which $CC)"
             $CC --version
             
-            # 配置并编译
-            make -j$(nproc) CC=$CC CFLAGS="-march=armv8-a -mtune=cortex-a57"
+            # 禁用jemalloc（解决交叉编译问题）
+            echo "禁用jemalloc，使用libc malloc"
+            make -j$(nproc) CC=$CC CFLAGS="-march=armv8-a -mtune=cortex-a57" MALLOC=libc
           else
             # 原生编译AMD64
             echo "配置AMD64原生编译环境..."
