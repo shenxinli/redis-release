@@ -230,7 +230,7 @@ jobs:
           }
           
           echo "FILE_NAME=$FILENAME" >> $env:GITHUB_ENV
-          echo "REDIS_FULL_VERSION=5 >> $env:GITHUB_ENV
+          echo "REDIS_FULL_VERSION=5" >> $env:GITHUB_ENV
 
       - name: Upload artifact
         if: env.platform_enabled == 'true'
