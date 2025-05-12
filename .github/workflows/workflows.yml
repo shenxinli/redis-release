@@ -215,7 +215,7 @@ jobs:
         if: env.platform_enabled == 'true'
         run: |
           $REDIS_VERSION = "5.0.14"  # Windows always uses 5.0.14
-          $FILENAME = "redis-$REDIS_VERSION-windows-x64.zip"
+          $FILENAME = "redis-5-windows-x64.zip"
           $URL = "https://github.com/tporadowski/redis/releases/download/v$($REDIS_VERSION)/Redis-x64-$($REDIS_VERSION).zip"
           
           Write-Host "Downloading $URL to $FILENAME"
