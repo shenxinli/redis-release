@@ -170,7 +170,7 @@ jobs:
           fi
           
           # Create binary tarball
-          BIN_DIR="redis-${REDIS_VERSION}-${{ matrix.platform_safe }}"
+          BIN_DIR="redis-${MAJOR_VERSION}-${{ matrix.platform_safe }}"
           mkdir -p $BIN_DIR/bin
           
           # Copy binaries
@@ -230,7 +230,7 @@ jobs:
           }
           
           echo "FILE_NAME=$FILENAME" >> $env:GITHUB_ENV
-          echo "REDIS_FULL_VERSION=$REDIS_VERSION" >> $env:GITHUB_ENV
+          echo "REDIS_FULL_VERSION=5 >> $env:GITHUB_ENV
 
       - name: Upload artifact
         if: env.platform_enabled == 'true'
